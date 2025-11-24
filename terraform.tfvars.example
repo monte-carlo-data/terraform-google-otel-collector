@@ -1,0 +1,44 @@
+# Required Variables
+# Copy this file to terraform.tfvars and fill in your values
+
+project_id      = "my-gcp-project-id"
+deployment_name = "my-otel-collector"
+region          = "us-central1"
+vpc_network     = "projects/my-gcp-project-id/global/networks/my-vpc"
+
+# VPC Configuration
+# Provide either vpc_subnet (to create a new VPC connector) or existing_vpc_connector
+vpc_subnet = "10.8.0.0/28"
+# existing_vpc_connector = "projects/my-gcp-project-id/locations/us-central1/connectors/my-connector"
+
+# Optional: Container Configuration
+# container_image = "otel/opentelemetry-collector-contrib:0.91.0"
+# grpc_port       = 4317
+# http_port       = 4318
+
+# Optional: Cloud Run Configuration
+# min_instances   = 1
+# max_instances   = 10
+# cpu             = "1"
+# memory          = "2Gi"
+# timeout_seconds = 300
+# concurrency     = 80
+
+# Optional: OTEL Configuration
+# batch_timeout          = "10s"
+# batch_size             = 1024
+# memory_limit_mib       = 1500
+# memory_spike_limit_mib = 512
+
+# Optional: Service Account
+# service_account_email = "my-service-account@my-gcp-project-id.iam.gserviceaccount.com"
+
+# Optional: Labels
+# labels = {
+#   environment = "production"
+#   team        = "platform"
+# }
+
+# Optional: Deletion Protection
+# deletion_protection = true  # Set to false for dev/test environments
+

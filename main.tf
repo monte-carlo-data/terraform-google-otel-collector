@@ -1,0 +1,197 @@
+# Data Sources
+
+data "google_project" "project" {
+  project_id = var.project_id
+}
+
+# Local Variables
+
+locals {
+  service_account_email = var.service_account_email != null ? var.service_account_email : google_service_account.otel_collector[0].email
+  vpc_connector_id      = var.existing_vpc_connector != null ? var.existing_vpc_connector : google_vpc_access_connector.otel_connector[0].id
+
+  # OTEL Collector configuration
+  otel_config = yamlencode({
+    extensions = {
+      health_check = {
+        endpoint = "0.0.0.0:13133"
+        path     = "/"
+      }
+    }
+    receivers = {
+      otlp = {
+        protocols = {
+          grpc = {
+            endpoint = "0.0.0.0:${var.grpc_port}"
+          }
+          http = {
+            endpoint = "0.0.0.0:${var.http_port}"
+          }
+        }
+      }
+    }
+    processors = {
+      batch = {
+        timeout         = var.batch_timeout
+        send_batch_size = var.batch_size
+      }
+      memory_limiter = {
+        check_interval  = "1s"
+        limit_mib       = var.memory_limit_mib
+        spike_limit_mib = var.memory_spike_limit_mib
+      }
+    }
+    exporters = {
+      debug = {
+        verbosity = "detailed"
+      }
+    }
+    service = {
+      extensions = ["health_check"]
+      pipelines = {
+        traces = {
+          receivers  = ["otlp"]
+          processors = ["memory_limiter", "batch"]
+          exporters  = ["debug"]
+        }
+        metrics = {
+          receivers  = ["otlp"]
+          processors = ["memory_limiter", "batch"]
+          exporters  = ["debug"]
+        }
+        logs = {
+          receivers  = ["otlp"]
+          processors = ["memory_limiter", "batch"]
+          exporters  = ["debug"]
+        }
+      }
+    }
+  })
+
+  common_labels = merge(
+    {
+      managed_by = "terraform"
+      module     = "terraform-google-otel-collector"
+    },
+    var.labels
+  )
+}
+
+# Service Account for Cloud Run
+
+resource "google_service_account" "otel_collector" {
+  count = var.service_account_email == null ? 1 : 0
+
+  project      = var.project_id
+  account_id   = "${var.deployment_name}-otel"
+  display_name = "OpenTelemetry Collector for ${var.deployment_name}"
+  description  = "Service account for OpenTelemetry Collector Cloud Run service"
+}
+
+# VPC Access Connector
+
+resource "google_vpc_access_connector" "otel_connector" {
+  count = var.existing_vpc_connector == null ? 1 : 0
+
+  project = var.project_id
+  name    = "${var.deployment_name}-vpc"
+  region  = var.region
+  network = var.vpc_network
+
+  ip_cidr_range = var.vpc_subnet
+
+  # Use default machine type (e2-micro) and scaling settings
+  min_instances = 2
+  max_instances = 3
+}
+
+# Cloud Run Service
+
+resource "google_cloud_run_v2_service" "otel_collector" {
+  project  = var.project_id
+  name     = "${var.deployment_name}-otel-collector"
+  location = var.region
+
+  ingress = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+
+  deletion_protection = var.deletion_protection
+
+  labels = local.common_labels
+
+  template {
+    service_account = local.service_account_email
+
+    scaling {
+      min_instance_count = var.min_instances
+      max_instance_count = var.max_instances
+    }
+
+    timeout = "${var.timeout_seconds}s"
+
+    vpc_access {
+      connector = local.vpc_connector_id
+      egress    = "PRIVATE_RANGES_ONLY"
+    }
+
+    containers {
+      image = var.container_image
+
+      resources {
+        limits = {
+          cpu    = var.cpu
+          memory = var.memory
+        }
+      }
+
+      # Cloud Run v2 only supports one port, using HTTP port as primary
+      # gRPC will also be available on the same port
+      ports {
+        name           = "http1"
+        container_port = var.http_port
+      }
+
+      env {
+        name  = "OTEL_CONFIG"
+        value = local.otel_config
+      }
+
+      # Pass config via command line argument
+      args = ["--config=env:OTEL_CONFIG"]
+
+      startup_probe {
+        initial_delay_seconds = 10
+        timeout_seconds       = 3
+        period_seconds        = 10
+        failure_threshold     = 3
+
+        http_get {
+          path = "/"
+          port = 13133
+        }
+      }
+
+      liveness_probe {
+        timeout_seconds   = 3
+        period_seconds    = 30
+        failure_threshold = 3
+
+        http_get {
+          path = "/"
+          port = 13133
+        }
+      }
+    }
+
+    max_instance_request_concurrency = var.concurrency
+  }
+
+  traffic {
+    type    = "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST"
+    percent = 100
+  }
+
+  depends_on = [
+    google_vpc_access_connector.otel_connector
+  ]
+}
+
