@@ -45,7 +45,7 @@ locals {
       debug = {
         verbosity = "detailed"
       }
-      googlepubsub = {
+      googlecloudpubsub = {
         project = var.project_id
         topic   = "projects/${var.project_id}/topics/otel_collector_traces_topic"
         encoding = "otlp_json"
@@ -57,7 +57,7 @@ locals {
         traces = {
           receivers  = ["otlp"]
           processors = ["memory_limiter", "batch"]
-          exporters  = ["debug", "googlepubsub"]
+          exporters  = ["debug", "googlecloudpubsub"]
         }
         metrics = {
           receivers  = ["otlp"]
