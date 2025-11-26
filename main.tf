@@ -45,6 +45,11 @@ locals {
       debug = {
         verbosity = "detailed"
       }
+      googlepubsub = {
+        project = var.project_id
+        topic   = "projects/${var.project_id}/topics/otel_collector_traces_topic"
+        encoding = "otlp_json"
+      }
     }
     service = {
       extensions = ["health_check"]
@@ -52,7 +57,7 @@ locals {
         traces = {
           receivers  = ["otlp"]
           processors = ["memory_limiter", "batch"]
-          exporters  = ["debug"]
+          exporters  = ["debug", "googlepubsub"]
         }
         metrics = {
           receivers  = ["otlp"]
@@ -192,6 +197,52 @@ resource "google_cloud_run_v2_service" "otel_collector" {
 
   depends_on = [
     google_vpc_access_connector.otel_connector
+  ]
+}
+
+# Pub/Sub Topic for Traces
+
+resource "google_pubsub_topic" "otel_collector_traces_topic" {
+  project = var.project_id
+  name    = "otel_collector_traces_topic"
+
+  labels = local.common_labels
+}
+
+# Pub/Sub Subscription with BigQuery Write
+
+resource "google_pubsub_subscription" "otel_collector_traces_subscription" {
+  count = var.bigquery_table_id != null ? 1 : 0
+
+  project = var.project_id
+  name    = "otel_collector_traces_subscription"
+  topic   = google_pubsub_topic.otel_collector_traces_topic.name
+
+  bigquery_config {
+    table               = var.bigquery_table_id
+    write_metadata      = true
+    use_topic_schema    = false
+    use_table_schema    = false
+    drop_unknown_fields = true
+  }
+
+  labels = local.common_labels
+
+  depends_on = [
+    google_pubsub_topic.otel_collector_traces_topic
+  ]
+}
+
+# IAM Permission for Pub/Sub Topic Publisher
+
+resource "google_pubsub_topic_iam_member" "otel_collector_traces_topic_publisher" {
+  project = var.project_id
+  topic   = google_pubsub_topic.otel_collector_traces_topic.name
+  role    = "roles/pubsub.publisher"
+  member  = "serviceAccount:${local.service_account_email}"
+
+  depends_on = [
+    google_pubsub_topic.otel_collector_traces_topic
   ]
 }
 

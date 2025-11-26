@@ -47,3 +47,25 @@ output "otel_config" {
   sensitive   = false
 }
 
+# Pub/Sub Outputs
+
+output "otel_collector_traces_topic_name" {
+  description = "Name of the Pub/Sub topic for traces"
+  value       = google_pubsub_topic.otel_collector_traces_topic.name
+}
+
+output "otel_collector_traces_topic_id" {
+  description = "Full ID of the Pub/Sub topic for traces"
+  value       = google_pubsub_topic.otel_collector_traces_topic.id
+}
+
+output "otel_collector_traces_subscription_name" {
+  description = "Name of the Pub/Sub subscription for traces (if created)"
+  value       = var.bigquery_table_id != null ? google_pubsub_subscription.otel_collector_traces_subscription[0].name : null
+}
+
+output "otel_collector_traces_subscription_id" {
+  description = "Full ID of the Pub/Sub subscription for traces (if created)"
+  value       = var.bigquery_table_id != null ? google_pubsub_subscription.otel_collector_traces_subscription[0].id : null
+}
+
