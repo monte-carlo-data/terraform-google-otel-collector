@@ -201,7 +201,7 @@ variable "memory_spike_limit_mib" {
 # Optional Variables - Service Account
 
 variable "service_account_email" {
-  description = "Email of an existing service account to use for Cloud Run. If not provided, a new service account will be created."
+  description = "Email of an existing service account to use for Cloud Run and Pub/Sub publisher permissions. If not provided, a new service account will be created."
   type        = string
   default     = null
 }
@@ -220,5 +220,11 @@ variable "deletion_protection" {
   description = "Enable deletion protection for Cloud Run service (recommended for production)"
   type        = bool
   default     = true
+}
+
+variable "bigquery_table_id" {
+  description = "BigQuery table ID for Pub/Sub subscription to write to (format: project.dataset.table or dataset.table)"
+  type        = string
+  default     = null
 }
 
