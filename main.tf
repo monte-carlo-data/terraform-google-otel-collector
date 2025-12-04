@@ -17,6 +17,9 @@ locals {
         endpoint = "0.0.0.0:13133"
         path     = "/"
       }
+      otlp_encoding = {
+        protocol = "otlp_json"
+      }
     }
     receivers = {
       otlp = {
@@ -47,12 +50,18 @@ locals {
       }
       googlecloudpubsub = {
         project = var.project_id
-        encoding = "otlp_json"
         topic   = google_pubsub_topic.otel_collector_traces_topic.id
+        traces = {
+          encoding = "otlp_encoding"
+          attributes = {
+            "ce-type"      = "org.opentelemetry.otlp.traces.v1"
+            "content-type" = "application/json"
+          }
+        }
       }
     }
     service = {
-      extensions = ["health_check"]
+      extensions = ["health_check", "otlp_encoding"]
       pipelines = {
         traces = {
           receivers  = ["otlp"]
