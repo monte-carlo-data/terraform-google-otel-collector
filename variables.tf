@@ -86,6 +86,17 @@ variable "http_port" {
 
 # Optional Variables - Cloud Run Configuration
 
+variable "ingress" {
+  description = "Ingress settings for Cloud Run service"
+  type        = string
+  default     = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+
+  validation {
+    condition     = contains(["INGRESS_TRAFFIC_ALL", "INGRESS_TRAFFIC_INTERNAL_ONLY", "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"], var.ingress)
+    error_message = "Ingress must be one of: INGRESS_TRAFFIC_ALL, INGRESS_TRAFFIC_INTERNAL_ONLY, INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER."
+  }
+}
+
 variable "min_instances" {
   description = "Minimum number of Cloud Run instances (0 for scale-to-zero)"
   type        = number

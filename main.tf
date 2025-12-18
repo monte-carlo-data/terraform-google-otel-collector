@@ -134,7 +134,7 @@ resource "google_cloud_run_v2_service" "otel_collector" {
   name     = "${var.deployment_name}-otel-collector"
   location = var.region
 
-  ingress = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+  ingress = var.ingress
 
   deletion_protection = var.deletion_protection
 
