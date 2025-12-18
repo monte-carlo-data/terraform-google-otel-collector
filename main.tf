@@ -10,6 +10,14 @@ locals {
   service_account_email = var.service_account_email != null ? var.service_account_email : google_service_account.otel_collector[0].email
   vpc_connector_id      = var.existing_vpc_connector != null ? var.existing_vpc_connector : google_vpc_access_connector.otel_connector[0].id
 
+  # Normalize vpc_network to a full resource path
+  # Handles both "my-network" and "projects/proj/global/networks/my-network"
+  vpc_network_id = (
+    startswith(var.vpc_network, "projects/") || startswith(var.vpc_network, "https://")
+    ? var.vpc_network
+    : "projects/${var.project_id}/global/networks/${var.vpc_network}"
+  )
+
   # OTEL Collector configuration
   otel_config = yamlencode({
     extensions = {
@@ -253,5 +261,44 @@ resource "google_pubsub_topic_iam_member" "otel_collector_traces_topic_publisher
   depends_on = [
     google_pubsub_topic.otel_collector_traces_topic
   ]
+}
+
+# Private DNS Zone for Cloud Run
+
+resource "google_dns_managed_zone" "run_app_zone" {
+  project     = var.project_id
+  name        = "${var.deployment_name}-run-app-zone"
+  dns_name    = "run.app."
+  description = "Private zone for Cloud Run internal access"
+  visibility  = "private"
+
+  private_visibility_config {
+    networks {
+      network_url = local.vpc_network_id
+    }
+  }
+
+  labels = local.common_labels
+}
+
+# A Records for Cloud Run restricted VIP
+
+resource "google_dns_record_set" "run_app_a" {
+  project      = var.project_id
+  name         = "*.run.app."
+  managed_zone = google_dns_managed_zone.run_app_zone.name
+  type         = "A"
+  ttl          = 300
+  rrdatas      = ["199.36.153.8", "199.36.153.9", "199.36.153.10", "199.36.153.11"]
+}
+
+# Route for Private Google Access
+
+resource "google_compute_route" "private_google_access" {
+  project          = var.project_id
+  name             = "${var.deployment_name}-private-google-access"
+  network          = var.vpc_network
+  dest_range       = "199.36.153.8/30"
+  next_hop_gateway = "default-internet-gateway"
 }
 
