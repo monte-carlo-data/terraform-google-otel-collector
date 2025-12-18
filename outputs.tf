@@ -69,3 +69,22 @@ output "otel_collector_traces_subscription_id" {
   value       = var.bigquery_table_id != null ? google_pubsub_subscription.otel_collector_traces_subscription[0].id : null
 }
 
+# DNS Outputs
+
+output "dns_zone_name" {
+  description = "Name of the private DNS zone for Cloud Run"
+  value       = google_dns_managed_zone.run_app_zone.name
+}
+
+output "dns_zone_id" {
+  description = "Full ID of the private DNS zone for Cloud Run"
+  value       = google_dns_managed_zone.run_app_zone.id
+}
+
+# Route Outputs
+
+output "private_google_access_route_name" {
+  description = "Name of the route for private Google access"
+  value       = google_compute_route.private_google_access.name
+}
+
